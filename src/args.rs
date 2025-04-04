@@ -2,7 +2,7 @@ use crate::canvas::Mode;
 use eyre::Context;
 use lexopt::prelude::*;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub(crate) struct Opt {
     pub(crate) log_x: bool,
     pub(crate) log_y: bool,
@@ -14,7 +14,7 @@ pub(crate) struct Opt {
 }
 
 impl Opt {
-    pub fn parse_from_env() -> eyre::Result<Self> {
+    pub fn parse_from_env(parser: &mut lexopt::Parser) -> eyre::Result<Self> {
         let mut opt = Opt {
             log_x: false,
             log_y: false,
@@ -24,7 +24,6 @@ impl Opt {
             mode: Mode::Dot,
             cdf: false,
         };
-        let mut parser = lexopt::Parser::from_env();
         while let Some(arg) = parser.next().context("read next argument")? {
             match arg {
                 Short('h') | Long("help") => {
@@ -89,5 +88,60 @@ impl Opt {
         }
 
         Ok(opt)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::ffi::OsString;
+    #[cfg(unix)]
+    use std::os::unix::ffi::{OsStrExt, OsStringExt};
+    #[cfg(windows)]
+    use std::os::windows::ffi::{OsStrExt, OsStringExt};
+
+    fn bad_string(text: &str) -> OsString {
+        #[cfg(any(unix, all(target_os = "wasi", target_env = "p1")))]
+        {
+            let mut text = text.as_bytes().to_vec();
+            for ch in &mut text {
+                if *ch == b'@' {
+                    *ch = b'\xFF';
+                }
+            }
+            OsString::from_vec(text)
+        }
+    }
+    #[test]
+    fn d_dims_ok() -> eyre::Result<()> {
+        let opt = Opt::parse_from_env(&mut lexopt::Parser::from_args(&["-d50x50"]))
+            .context("parse command-line arguments")?;
+        assert_eq!(
+            opt,
+            Opt {
+                log_x: false,
+                log_y: false,
+                x_is_row: true,
+                width: 50,
+                height: 50,
+                mode: Mode::Dot,
+                cdf: false,
+            }
+        );
+        Ok(())
+    }
+    #[test]
+    #[should_panic(expected = "-d must be specified as WxH (eg, 72x40, which is the default)")]
+    fn d_dims_missing() {
+        Opt::parse_from_env(&mut lexopt::Parser::from_args(&["-dd"]))
+            .context("parse command-line arguments")
+            .unwrap();
+    }
+    #[test]
+    #[should_panic(expected = "-d argument contains invalid characters")]
+    fn d_dims_inv_char() {
+        Opt::parse_from_env(&mut lexopt::Parser::from_args(&[bad_string("-d@")]))
+            .context("parse command-line arguments")
+            .unwrap();
     }
 }

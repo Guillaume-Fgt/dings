@@ -23,7 +23,8 @@ fn main() -> eyre::Result<()> {
         height,
         mode,
         cdf,
-    } = Opt::parse_from_env().context("parse command-line arguments")?;
+    } = Opt::parse_from_env(&mut lexopt::Parser::from_env())
+        .context("parse command-line arguments")?;
 
     let mut data = Data::default();
     let mut canvas = Canvas::new(height, width, mode);

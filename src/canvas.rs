@@ -1,6 +1,6 @@
 use std::fmt;
 
-#[derive(Debug, Default, Copy, Clone)]
+#[derive(Debug, Default, Copy, Clone, PartialEq)]
 pub(crate) enum Mode {
     #[default]
     Dot,
